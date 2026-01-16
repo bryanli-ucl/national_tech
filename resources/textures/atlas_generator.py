@@ -34,7 +34,7 @@ class TextureAtlasBuilder:
             num_textures = self.max_textures
         
         # 计算实际需要的图集大小（可以优化为更小的尺寸）
-        textures_per_side = math.ceil(math.sqrt(num_textures))
+        textures_per_side = math.ceil(math.log2(math.sqrt(num_textures))) ** 2
         actual_atlas_size = textures_per_side * self.texture_size
         
         print(f"纹理尺寸: {self.texture_size}x{self.texture_size}")
@@ -116,10 +116,10 @@ def main():
     
     # 配置
     TEXTURE_SIZE = 16
-    ATLAS_SIZE = 1024  # 可以是 512, 1024, 2048, 4096 等
-    INPUT_DIR = "resources/textures/raw_blocks"  # 存放所有 16x16 纹理的目录
-    OUTPUT_ATLAS = "resources/textures/blocks/block_atlas.png"
-    OUTPUT_METADATA = "resources/textures/blocks/block_atlas.json"
+    ATLAS_SIZE = 2048  # 可以是 512, 1024, 2048, 4096 等
+    INPUT_DIR = "bedrock-samples-1.21.130.3/resource_pack/textures/blocks/"  # 存放所有 16x16 纹理的目录
+    OUTPUT_ATLAS = "resources/textures/blocks/universe_block_atlas.png"
+    OUTPUT_METADATA = "resources/textures/blocks/universe_block_atlas.json"
     
     # 查找所有纹理文件
     texture_files = []

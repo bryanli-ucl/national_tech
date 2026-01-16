@@ -27,6 +27,4 @@ void main() {
 
     vec3 result = (ambient + diffuse) * texColor.rgb;
     FragColor   = vec4(result, texColor.a);
-
-    FragColor = texColor;
 }

@@ -27,8 +27,8 @@ class IndexedCubeMesh {
         MeshData mesh;
 
         // 从图集获取 UV 坐标
-        TextureUV topUV    = atlas.getUV("grass_top");
-        TextureUV sideUV   = atlas.getUV("grass_side");
+        TextureUV topUV    = atlas.getUV("grass_carried");
+        TextureUV sideUV   = atlas.getUV("grass_side_carried");
         TextureUV bottomUV = atlas.getUV("dirt");
 
         // 8 个顶点位置

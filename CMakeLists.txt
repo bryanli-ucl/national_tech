@@ -24,7 +24,7 @@ file(GLOB_RECURSE SOURCES
     "src/*.h"
 )
 
-include_directories(include)
+include_directories(external)
 include_directories(src)
 
 add_executable(${PROJECT_NAME} ${SOURCES})

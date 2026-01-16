@@ -18,13 +18,13 @@
 
 #include "utils/check.hpp"
 
-// 错误检查函数
 auto main(__attribute_maybe_unused__ int argc, __attribute_maybe_unused__ char** argv) -> int {
 
     try {
 
         utils::log().setLevel(utils::LogLevel::DEBUG);
 
+        LOG_SEPARATOR();
         LOG_INFO("NATIONAL TECHNOLOGY STARTING");
 
         glfwInit();
@@ -60,6 +60,8 @@ auto main(__attribute_maybe_unused__ int argc, __attribute_maybe_unused__ char**
 
         glEnable(GL_DEPTH_TEST);
 
+        LOG_SEPARATOR();
+
         {
             // shader
             LOG_INFO("Compiling shaders");
@@ -72,23 +74,23 @@ auto main(__attribute_maybe_unused__ int argc, __attribute_maybe_unused__ char**
 
             // texture
             LOG_INFO("Load texture atlas");
-            renderer::texture atlas_texture("resources/textures/blocks/block_atlas.png");
+            renderer::texture atlas_texture("resources/textures/blocks/universe_block_atlas.png");
             LOG_DEBUG("Texture loaded - ID: ", atlas_texture.get_id(), ", Size: ", atlas_texture.get_width(), "x", atlas_texture.get_height());
 
             // atlas metadata
-            LOG_INFO("Loading atlas metadata...");
+            LOG_INFO("Loading atlas metadata from JSON...");
             renderer::TextureAtlas atlas;
-            atlas.setupFromImageSize(atlas_texture.get_width(), atlas_texture.get_height(), 16);
+            atlas.loadFromJSON("resources/textures/blocks/universe_block_atlas.json");
 
-            LOG_INFO("Registing texture coordination");
-            atlas.registerTexture("grass_top", 8);  // 第一个纹理
-            atlas.registerTexture("grass_side", 5); // 第二个纹理
-            atlas.registerTexture("dirt", 6);       // 第三个纹理
-            /*
-            6 7 8
-            3 4 5
-            0 1 2
-            */
+            LOG_DEBUG("Loaded textures:");
+            if (atlas.hasTexture("grass_top")) {
+                auto uv = atlas.getUV("grass_top");
+                LOG_DEBUG("  grass_top: (", uv.min.x, ",", uv.min.y, ") -> (", uv.max.x, ",", uv.max.y, ")");
+            }
+            if (atlas.hasTexture("dirt")) {
+                auto uv = atlas.getUV("dirt");
+                LOG_DEBUG("  dirt: (", uv.min.x, ",", uv.min.y, ") -> (", uv.max.x, ",", uv.max.y, ")");
+            }
 
             // mesh
             LOG_INFO("Generating block meshes");
@@ -129,11 +131,12 @@ auto main(__attribute_maybe_unused__ int argc, __attribute_maybe_unused__ char**
 
             LOG_INFO("VAO, VBO, EBO setup");
 
+            LOG_SEPARATOR();
             LOG_INFO("GAME START");
 
             // 光照和相机参数
             glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
-            glm::vec3 viewPos(0.0f, 0.0f, 3.0f);
+            glm::vec3 viewPos(0.0f, 0.0f, 10.0f);
 
             __attribute_maybe_unused__ size_t frame_cnt = 0;
             while (!glfwWindowShouldClose(window.get())) {
@@ -154,10 +157,9 @@ auto main(__attribute_maybe_unused__ int argc, __attribute_maybe_unused__ char**
                 lighting_shader.set("lightColor", glm::vec3(1.0f, 1.0f, 1.0f));
                 lighting_shader.set("objectColor", glm::vec3(1.0f, 0.5f, 0.31f));
 
-                glm::mat4 model = glm::rotate(glm::mat4(1.0f), (float)glfwGetTime(), glm::vec3(0.5f, 1.0f, 0.0f));
-
-                glm::mat4 view = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -3.0f));
-
+                // glm::mat4 model = glm::mat4(1.0f);
+                glm::mat4 model      = glm::rotate(glm::mat4(1.0f), (float)glfwGetTime(), glm::vec3(0.5f, 1.0f, 0.0f));
+                glm::mat4 view       = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -10.0f));
                 glm::mat4 projection = glm::perspective(glm::radians(45.0f), 1280.0f / 720.0f, 0.1f, 100.0f);
 
                 lighting_shader.set("model", model);
@@ -165,7 +167,7 @@ auto main(__attribute_maybe_unused__ int argc, __attribute_maybe_unused__ char**
                 lighting_shader.set("projection", projection);
 
                 lighting_shader.set("lightPos", glm::vec3(1.2f, 1.0f, 2.0f));
-                lighting_shader.set("viewPos", glm::vec3(0.0f, 0.0f, 3.0f));
+                lighting_shader.set("viewPos", glm::vec3(0.0f, 0.0f, 5.0f));
                 lighting_shader.set("lightColor", glm::vec3(1.0f, 1.0f, 1.0f));
 
                 // 绘制立方体
@@ -174,6 +176,7 @@ auto main(__attribute_maybe_unused__ int argc, __attribute_maybe_unused__ char**
 
                 glfwSwapBuffers(window.get());
                 glfwPollEvents();
+
                 frame_cnt++;
             }
 
@@ -186,6 +189,7 @@ auto main(__attribute_maybe_unused__ int argc, __attribute_maybe_unused__ char**
 
         LOG_INFO("Shut down");
         glfwTerminate();
+
     } catch (std::exception& e) {
         LOG_FATAL("FATAL EXCEPTION: ", e.what());
         glfwTerminate();
