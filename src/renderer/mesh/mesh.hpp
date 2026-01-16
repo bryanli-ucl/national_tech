@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -9,32 +10,55 @@
 
 namespace renderer {
 
+/**
+ * @brief Vertex structure for mesh data
+ * Contains position, normal, and texture coordinates
+ */
 struct Vertex {
     glm::vec3 position;
     glm::vec3 normal;
     glm::vec2 texCoord;
+    glm::vec4 textureBounds;
 };
 
+/**
+ * @brief Utility class for generating cube/block meshes
+ * Provides methods to create textured cubes with individual face textures
+ */
 class CubeMesh {
     public:
+    /**
+     * @brief Container for mesh geometry data
+     * Stores vertices and indices that can be uploaded to GPU
+     */
     struct MeshData {
-        std::vector<Vertex> vertices;
-        std::vector<uint32_t> indices;
+        std::vector<Vertex> vertices;  // Vertex data array
+        std::vector<uint32_t> indices; // Index array for indexed drawing
 
-        void append(const MeshData& other) {
-            uint32_t indexOffset = vertices.size();
-
-            // 添加顶点
-            vertices.insert(vertices.end(), other.vertices.begin(), other.vertices.end());
-
-            // 添加索引（需要偏移）
-            for (uint32_t index : other.indices) {
-                indices.push_back(index + indexOffset);
-            }
-        }
+        /**
+         * @brief Append another mesh to this one
+         * Properly offsets indices when merging meshes
+         * @param other Mesh data to append
+         */
+        void append(const MeshData& other);
     };
 
-    // 创建任意方块（指定每个面的纹理名称）
+    /**
+     * @brief Create a textured block with individual face textures
+     *
+     * Generates a unit cube centered at origin with customizable
+     * textures for each face. Texture coordinates are obtained from
+     * the texture atlas.
+     *
+     * @param atlas Texture atlas containing all textures
+     * @param front_tex Texture name for front face (+Z)
+     * @param back_tex Texture name for back face (-Z)
+     * @param left_tex Texture name for left face (-X)
+     * @param right_tex Texture name for right face (+X)
+     * @param top_tex Texture name for top face (+Y)
+     * @param bottom_tex Texture name for bottom face (-Y)
+     * @return Generated mesh data
+     */
     static MeshData createBlock(
     const TextureAtlas& atlas,
     const std::string& front_tex,
@@ -42,30 +66,23 @@ class CubeMesh {
     const std::string& left_tex,
     const std::string& right_tex,
     const std::string& top_tex,
-    const std::string& bottom_tex) {
-        MeshData mesh;
-
-        std::vector<glm::vec3> positions = {
-            { -0.5f, -0.5f, -0.5f }, { 0.5f, -0.5f, -0.5f },
-            { 0.5f, 0.5f, -0.5f }, { -0.5f, 0.5f, -0.5f },
-            { -0.5f, -0.5f, 0.5f }, { 0.5f, -0.5f, 0.5f },
-            { 0.5f, 0.5f, 0.5f }, { -0.5f, 0.5f, 0.5f }
-        };
-
-        mesh.vertices.reserve(24);
-        mesh.indices.reserve(36);
-
-        addQuad(mesh, atlas.getUV(front_tex), positions[4], positions[5], positions[6], positions[7], { 0, 0, 1 });
-        addQuad(mesh, atlas.getUV(back_tex), positions[1], positions[0], positions[3], positions[2], { 0, 0, -1 });
-        addQuad(mesh, atlas.getUV(left_tex), positions[0], positions[4], positions[7], positions[3], { -1, 0, 0 });
-        addQuad(mesh, atlas.getUV(right_tex), positions[5], positions[1], positions[2], positions[6], { 1, 0, 0 });
-        addQuad(mesh, atlas.getUV(top_tex), positions[7], positions[6], positions[2], positions[3], { 0, 1, 0 });
-        addQuad(mesh, atlas.getUV(bottom_tex), positions[0], positions[1], positions[5], positions[4], { 0, -1, 0 });
-
-        return mesh;
-    }
+    const std::string& bottom_tex);
 
     private:
+    /**
+     * @brief Add a quad (two triangles) to the mesh
+     *
+     * Creates a quad from four vertices with specified texture coordinates
+     * and normal. Generates two triangles in counter-clockwise winding order.
+     *
+     * @param mesh Mesh data to append to
+     * @param uv Texture coordinates for this quad
+     * @param v0 First vertex position
+     * @param v1 Second vertex position
+     * @param v2 Third vertex position
+     * @param v3 Fourth vertex position
+     * @param normal Surface normal for all vertices
+     */
     static void addQuad(
     MeshData& mesh,
     const TextureUV& uv,
@@ -73,16 +90,7 @@ class CubeMesh {
     const glm::vec3& v1,
     const glm::vec3& v2,
     const glm::vec3& v3,
-    const glm::vec3& normal) {
-        uint32_t startIdx = mesh.vertices.size();
-
-        mesh.vertices.push_back({ v0, normal, glm::vec2(uv.min.x, uv.min.y) });
-        mesh.vertices.push_back({ v1, normal, glm::vec2(uv.max.x, uv.min.y) });
-        mesh.vertices.push_back({ v2, normal, glm::vec2(uv.max.x, uv.max.y) });
-        mesh.vertices.push_back({ v3, normal, glm::vec2(uv.min.x, uv.max.y) });
-
-        mesh.indices.insert(mesh.indices.end(), { startIdx + 0, startIdx + 1, startIdx + 2, startIdx + 2, startIdx + 3, startIdx + 0 });
-    }
+    const glm::vec3& normal);
 };
 
 } // namespace renderer

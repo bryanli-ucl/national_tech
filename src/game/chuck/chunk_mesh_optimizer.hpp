@@ -13,25 +13,35 @@ namespace game::chuck {
 // 简化的方块世界表示
 class VoxelChunk {
     private:
-    static constexpr int CHUNK_SIZE = 16;
-    uint32_t blocks[CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE];
+    static constexpr int CHUNK_SIZE_X = 16;
+    static constexpr int CHUNK_SIZE_Y = 256;
+    static constexpr int CHUNK_SIZE_Z = 16;
+
+    std::vector<uint32_t> blocks;
+    int getIndex(int x, int y, int z) const {
+        return x + y * CHUNK_SIZE_X + z * CHUNK_SIZE_X * CHUNK_SIZE_Y;
+    }
 
     public:
     VoxelChunk() {
-        std::fill(&blocks[0][0][0], &blocks[0][0][0] + CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE, 0);
+        blocks.resize(CHUNK_SIZE_X * CHUNK_SIZE_Y * CHUNK_SIZE_Z, 0);
     }
 
     void setBlock(int x, int y, int z, uint32_t typeId) {
-        if (x >= 0 && x < CHUNK_SIZE && y >= 0 && y < CHUNK_SIZE && z >= 0 && z < CHUNK_SIZE) {
-            blocks[x][y][z] = typeId;
+        if (x >= 0 && x < CHUNK_SIZE_X &&
+        y >= 0 && y < CHUNK_SIZE_Y &&
+        z >= 0 && z < CHUNK_SIZE_Z) {
+            blocks[getIndex(x, y, z)] = typeId;
         }
     }
 
     uint32_t getBlock(int x, int y, int z) const {
-        if (x < 0 || x >= CHUNK_SIZE || y < 0 || y >= CHUNK_SIZE || z < 0 || z >= CHUNK_SIZE) {
-            return 0; // 外部视为空气
+        if (x < 0 || x >= CHUNK_SIZE_X ||
+        y < 0 || y >= CHUNK_SIZE_Y ||
+        z < 0 || z >= CHUNK_SIZE_Z) {
+            return 0;
         }
-        return blocks[x][y][z];
+        return blocks[getIndex(x, y, z)];
     }
 
     bool isBlockSolid(int x, int y, int z) const {
@@ -62,6 +72,10 @@ class VoxelChunk {
         // 如果相邻是空气或透明方块，需要渲染这个面
         return !isBlockSolid(nx, ny, nz);
     }
+
+    int getSizeX() const { return CHUNK_SIZE_X; }
+    int getSizeY() const { return CHUNK_SIZE_Y; }
+    int getSizeZ() const { return CHUNK_SIZE_Z; }
 };
 
 // 优化的区块网格生成器
@@ -73,20 +87,22 @@ class OptimizedChunkMeshBuilder {
     OptimizedChunkMeshBuilder(renderer::TextureAtlas* textureAtlas)
     : atlas(textureAtlas) {}
 
-    // 生成区块网格（只渲染可见面）
     std::unordered_map<uint32_t, renderer::CubeMesh::MeshData> generateChunkMesh(const VoxelChunk& chunk) {
         std::unordered_map<uint32_t, renderer::CubeMesh::MeshData> meshes;
 
-        for (int x = 0; x < 16; x++) {
-            for (int y = 0; y < 16; y++) {
-                for (int z = 0; z < 16; z++) {
+        int sizeX = chunk.getSizeX();
+        int sizeY = chunk.getSizeY();
+        int sizeZ = chunk.getSizeZ();
+
+        for (int x = 0; x < sizeX; x++) {
+            for (int y = 0; y < sizeY; y++) {
+                for (int z = 0; z < sizeZ; z++) {
                     uint32_t typeId = chunk.getBlock(x, y, z);
-                    if (typeId == 0) continue; // 跳过空气
+                    if (typeId == 0) continue;
 
                     auto* blockType = blocks::BlockTypeRegistry::getInstance().getBlockType(typeId);
                     if (!blockType) continue;
 
-                    // 为每个可见面添加网格
                     for (int faceIdx = 0; faceIdx < 6; faceIdx++) {
                         blocks::BlockFace face = static_cast<blocks::BlockFace>(faceIdx);
 

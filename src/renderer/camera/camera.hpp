@@ -1,13 +1,14 @@
 #pragma once
 
 #include <GLFW/glfw3.h>
-
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-
 namespace renderer {
 
+/**
+ * @brief Camera movement directions
+ */
 enum class CameraMovement {
     FORWARD,
     BACKWARD,
@@ -17,128 +18,103 @@ enum class CameraMovement {
     DOWN
 };
 
+/**
+ * @brief First-person camera class
+ *
+ * Implements a free-flying first-person camera with:
+ * - Keyboard movement (WASD + vertical)
+ * - Mouse look (yaw and pitch)
+ * - Mouse scroll zoom (FOV adjustment)
+ * - Configurable movement speed and mouse sensitivity
+ */
 class Camera {
     public:
-    // 相机属性
-    glm::vec3 position;
-    glm::vec3 front;
-    glm::vec3 up;
-    glm::vec3 right;
-    glm::vec3 worldUp;
+    // Camera vectors
+    glm::vec3 position; // Camera position in world space
+    glm::vec3 front;    // Forward direction vector
+    glm::vec3 up;       // Up direction vector
+    glm::vec3 right;    // Right direction vector
+    glm::vec3 worldUp;  // World up vector (usually +Y)
 
-    // 欧拉角
-    float yaw;
-    float pitch;
+    // Euler angles (in degrees)
+    float yaw;   // Rotation around Y axis
+    float pitch; // Rotation around X axis
 
-    // 相机选项
-    float movementSpeed;
-    float mouseSensitivity;
-    float zoom;
+    // Camera options
+    float movementSpeed;    // Movement speed in units/second
+    float mouseSensitivity; // Mouse sensitivity multiplier
+    float zoom;             // Field of view in degrees
 
-    // 构造函数
+    /**
+     * @brief Construct a new Camera object
+     * @param pos Initial position
+     * @param up World up vector
+     * @param yaw Initial yaw angle in degrees
+     * @param pitch Initial pitch angle in degrees
+     */
     Camera(
     glm::vec3 pos = glm::vec3(0.0f, 0.0f, 3.0f),
     glm::vec3 up  = glm::vec3(0.0f, 1.0f, 0.0f),
     float yaw     = -90.0f,
-    float pitch   = 0.0f)
-    : position(pos),
-      front(glm::vec3(0.0f, 0.0f, -1.0f)),
-      worldUp(up),
-      yaw(yaw), pitch(pitch),
-      movementSpeed(8.0f),
-      mouseSensitivity(0.1f),
-      zoom(45.0f) {
-        updateCameraVectors();
-    }
+    float pitch   = 0.0f);
 
-    // 获取视图矩阵
-    glm::mat4 getViewMatrix() const {
-        return glm::lookAt(position, position + front, up);
-    }
+    /**
+     * @brief Get view matrix for rendering
+     * @return View matrix (world to camera transform)
+     */
+    glm::mat4 getViewMatrix() const;
 
-    // 获取投影矩阵
-    glm::mat4 getProjectionMatrix(float aspectRatio, float nearPlane = 0.1f, float farPlane = 100.0f) const {
-        return glm::perspective(glm::radians(zoom), aspectRatio, nearPlane, farPlane);
-    }
+    /**
+     * @brief Get projection matrix for rendering
+     * @param aspectRatio Viewport aspect ratio (width/height)
+     * @param nearPlane Near clipping plane distance
+     * @param farPlane Far clipping plane distance
+     * @return Perspective projection matrix
+     */
+    glm::mat4 getProjectionMatrix(
+    float aspectRatio,
+    float nearPlane = 0.1f,
+    float farPlane  = 1024.0f) const;
 
-    // 处理键盘输入
-    void processKeyboard(CameraMovement direction, float deltaTime) {
-        float velocity = movementSpeed * deltaTime;
+    /**
+     * @brief Process keyboard input for camera movement
+     * @param direction Movement direction
+     * @param deltaTime Time elapsed since last frame (for frame-rate independence)
+     */
+    void processKeyboard(CameraMovement direction, float deltaTime);
 
-        switch (direction) {
-        case CameraMovement::FORWARD:
-            position += front * velocity;
-            break;
-        case CameraMovement::BACKWARD:
-            position -= front * velocity;
-            break;
-        case CameraMovement::LEFT:
-            position -= right * velocity;
-            break;
-        case CameraMovement::RIGHT:
-            position += right * velocity;
-            break;
-        case CameraMovement::UP:
-            position += up * velocity;
-            break;
-        case CameraMovement::DOWN:
-            position -= up * velocity;
-            break;
-        }
-    }
+    /**
+     * @brief Process mouse movement for camera rotation
+     * @param xoffset Mouse X offset
+     * @param yoffset Mouse Y offset
+     * @param constrainPitch Whether to limit pitch to prevent flipping
+     */
+    void processMouseMovement(float xoffset, float yoffset, bool constrainPitch = true);
 
-    // 处理鼠标移动
-    void processMouseMovement(float xoffset, float yoffset, bool constrainPitch = true) {
-        xoffset *= mouseSensitivity;
-        yoffset *= mouseSensitivity;
+    /**
+     * @brief Process mouse scroll for zoom (FOV adjustment)
+     * @param yoffset Scroll wheel offset
+     */
+    void processMouseScroll(float yoffset);
 
-        yaw += xoffset;
-        pitch += yoffset;
+    /**
+     * @brief Set camera movement speed
+     * @param speed New movement speed
+     */
+    void setMovementSpeed(float speed);
 
-        // 限制俯仰角，防止屏幕翻转
-        if (constrainPitch) {
-            if (pitch > 89.0f)
-                pitch = 89.0f;
-            if (pitch < -89.0f)
-                pitch = -89.0f;
-        }
-
-        updateCameraVectors();
-    }
-
-    // 处理鼠标滚轮（缩放）
-    void processMouseScroll(float yoffset) {
-        zoom -= yoffset;
-        if (zoom < 1.0f)
-            zoom = 1.0f;
-        if (zoom > 45.0f)
-            zoom = 45.0f;
-    }
-
-    // 设置移动速度
-    void setMovementSpeed(float speed) {
-        movementSpeed = speed;
-    }
-
-    // 设置鼠标灵敏度
-    void setMouseSensitivity(float sensitivity) {
-        mouseSensitivity = sensitivity;
-    }
+    /**
+     * @brief Set mouse sensitivity
+     * @param sensitivity New mouse sensitivity
+     */
+    void setMouseSensitivity(float sensitivity);
 
     private:
-    // 更新相机向量
-    void updateCameraVectors() {
-        // 计算新的front向量
-        glm::vec3 newFront;
-        newFront.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
-        newFront.y = sin(glm::radians(pitch));
-        newFront.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
-        front      = glm::normalize(newFront);
-
-        // 重新计算right和up向量
-        right = glm::normalize(glm::cross(front, worldUp));
-        up    = glm::normalize(glm::cross(right, front));
-    }
+    /**
+     * @brief Update camera direction vectors from Euler angles
+     * Calculates front, right, and up vectors based on current yaw and pitch
+     */
+    void updateCameraVectors();
 };
 
 } // namespace renderer

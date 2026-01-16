@@ -1,6 +1,5 @@
 #pragma once
 
-
 #include <algorithm>
 #include <cmath>
 #include <random>
@@ -8,89 +7,87 @@
 
 namespace game::generator {
 
+/**
+ * @brief Perlin noise generator for procedural terrain generation
+ *
+ * Implements classic Perlin noise algorithm with:
+ * - Permutation table for pseudo-random gradients
+ * - Smooth interpolation using fade curves
+ * - Fractal Brownian Motion (FBM) for multi-octave noise
+ *
+ * Uses Ken Perlin's improved noise function with smoothstep interpolation.
+ */
 class PerlinNoise {
     private:
-    std::vector<int> p; // 置换表
+    std::vector<int> p; // Permutation table (duplicated for overflow prevention)
 
     public:
-    // 构造函数，可以指定种子
-    PerlinNoise(unsigned int seed = std::default_random_engine::default_seed) {
-        p.resize(256);
+    /**
+     * @brief Construct a new Perlin Noise generator
+     * @param seed Random seed for permutation table initialization
+     */
+    PerlinNoise(unsigned int seed = std::default_random_engine::default_seed);
 
-        // 初始化置换表
-        for (int i = 0; i < 256; i++) {
-            p[i] = i;
-        }
+    /**
+     * @brief Generate 2D Perlin noise value
+     *
+     * Returns smooth, continuous pseudo-random values based on input coordinates.
+     * Uses bilinear interpolation between gradient vectors at grid corners.
+     *
+     * @param x X coordinate in noise space
+     * @param y Y coordinate in noise space
+     * @return Noise value in range [-1, 1]
+     */
+    double noise(double x, double y);
 
-        // 使用种子打乱
-        std::default_random_engine engine(seed);
-        std::shuffle(p.begin(), p.end(), engine);
-
-        // 复制一份，避免溢出
-        p.insert(p.end(), p.begin(), p.end());
-    }
-
-    // 2D柏林噪声
-    double noise(double x, double y) {
-        // 找到单位网格的坐标
-        int X = (int)floor(x) & 255;
-        int Y = (int)floor(y) & 255;
-
-        // 找到相对于网格的坐标
-        x -= floor(x);
-        y -= floor(y);
-
-        // 计算淡入淡出曲线
-        double u = fade(x);
-        double v = fade(y);
-
-        // 哈希四个角的坐标
-        int A = p[X] + Y;
-        int B = p[X + 1] + Y;
-
-        // 插值计算
-        return lerp(v,
-        lerp(u, grad(p[A], x, y), grad(p[B], x - 1, y)),
-        lerp(u, grad(p[A + 1], x, y - 1), grad(p[B + 1], x - 1, y - 1)));
-    }
-
-    // 分形布朗运动（多层噪声叠加）
-    double fbm(double x, double y, int octaves = 4, double persistence = 0.5) {
-        double total     = 0.0;
-        double frequency = 1.0;
-        double amplitude = 1.0;
-        double maxValue  = 0.0;
-
-        for (int i = 0; i < octaves; i++) {
-            total += noise(x * frequency, y * frequency) * amplitude;
-
-            maxValue += amplitude;
-            amplitude *= persistence;
-            frequency *= 2.0;
-        }
-
-        return total / maxValue;
-    }
+    /**
+     * @brief Generate Fractal Brownian Motion (FBM) noise
+     *
+     * Combines multiple octaves of Perlin noise at different frequencies
+     * and amplitudes to create more natural-looking terrain patterns.
+     * Each octave adds finer detail to the noise.
+     *
+     * @param x X coordinate in noise space
+     * @param y Y coordinate in noise space
+     * @param octaves Number of noise layers to combine (more = more detail)
+     * @param persistence Amplitude multiplier per octave (controls roughness)
+     * @return Normalized noise value in range [-1, 1]
+     */
+    double fbm(double x, double y, int octaves = 4, double persistence = 0.5);
 
     private:
-    // 淡入淡出函数
-    double fade(double t) {
-        return t * t * t * (t * (t * 6 - 15) + 10);
-    }
+    /**
+     * @brief Fade function for smooth interpolation
+     *
+     * Uses 6t^5 - 15t^4 + 10t^3 curve (Perlin's improved smoothstep)
+     * to create smooth transitions between grid cells.
+     *
+     * @param t Input value in range [0, 1]
+     * @return Smoothed value in range [0, 1]
+     */
+    double fade(double t);
 
-    // 线性插值
-    double lerp(double t, double a, double b) {
-        return a + t * (b - a);
-    }
+    /**
+     * @brief Linear interpolation between two values
+     * @param t Interpolation factor [0, 1]
+     * @param a Start value
+     * @param b End value
+     * @return Interpolated value
+     */
+    double lerp(double t, double a, double b);
 
-    // 梯度函数
-    double grad(int hash, double x, double y) {
-        int h    = hash & 15;
-        double u = h < 8 ? x : y;
-        double v = h < 4 ? y : h == 12 || h == 14 ? x :
-                                                    0;
-        return ((h & 1) == 0 ? u : -u) + ((h & 2) == 0 ? v : -v);
-    }
+    /**
+     * @brief Calculate gradient at grid point
+     *
+     * Computes dot product between pseudo-random gradient vector
+     * and distance vector from grid point.
+     *
+     * @param hash Hash value determining gradient direction
+     * @param x X distance from grid point
+     * @param y Y distance from grid point
+     * @return Gradient contribution
+     */
+    double grad(int hash, double x, double y);
 };
 
 } // namespace game::generator

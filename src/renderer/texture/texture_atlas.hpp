@@ -8,7 +8,7 @@
 
 #include <nlohmann/json.hpp>
 
-#include "utils/logger.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace renderer {
 

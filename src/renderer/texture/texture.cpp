@@ -7,7 +7,7 @@
 #include <iostream>
 #include <stdexcept>
 
-#include "utils/logger.hpp"
+#include "utils/logger/logger.hpp"
 
 namespace renderer {
 

@@ -6,7 +6,9 @@
 #include <unordered_map>
 
 #include "game/chuck/chunk_mesh_optimizer.hpp"
+#include "game/chuck/greedy_meshing.hpp"
 #include "game/generator/terrain_generator.hpp"
+
 #include "renderer/mesh/frustum.hpp"
 #include "renderer/render/instanced_block_renderer.hpp"
 
@@ -37,33 +39,36 @@ struct Chunk {
 };
 
 class ChunkManager {
+
+
     private:
     std::unordered_map<glm::ivec2, std::unique_ptr<Chunk>, ChunkCoordHash> chunks;
     OptimizedChunkMeshBuilder* meshBuilder;
-    generator::TerrainGenerator* terrainGen;
-    int renderDistance = 8; // 渲染距离（区块数）
+    game::generator::TerrainGenerator* terrainGen;
+    int renderDistance = 8;
 
     public:
-    ChunkManager(OptimizedChunkMeshBuilder* builder, generator::TerrainGenerator* generator)
-    : meshBuilder(builder), terrainGen(generator) {}
+    ChunkManager(OptimizedChunkMeshBuilder* builder, game::generator::TerrainGenerator* generator)
+    : meshBuilder(builder), terrainGen(generator) {
 
-    // 设置渲染距离
+        if (!terrainGen) {
+            throw std::runtime_error("TerrainGenerator cannot be null");
+        }
+    }
+
     void setRenderDistance(int distance) {
         renderDistance = distance;
     }
 
-    // 更新区块（根据玩家位置）
     void update(const glm::vec3& playerPos) {
         glm::ivec2 playerChunk(
         static_cast<int>(floor(playerPos.x / 16.0f)),
         static_cast<int>(floor(playerPos.z / 16.0f)));
 
-        // 生成玩家周围的区块
         for (int x = -renderDistance; x <= renderDistance; x++) {
             for (int z = -renderDistance; z <= renderDistance; z++) {
                 glm::ivec2 chunkCoord = playerChunk + glm::ivec2(x, z);
 
-                // 圆形渲染距离检查
                 if (x * x + z * z > renderDistance * renderDistance) {
                     continue;
                 }
@@ -73,38 +78,29 @@ class ChunkManager {
                 }
             }
         }
-
-        // TODO: 卸载远离的区块
     }
 
-    // 渲染可见区块（使用视锥剔除）
     void render(const renderer::Frustum& frustum) {
         int visibleChunks = 0;
         int totalChunks   = chunks.size();
 
         for (auto& [coord, chunk] : chunks) {
-            // 视锥剔除
             if (!frustum.isBoxVisible(chunk->boundingBox)) {
                 continue;
             }
 
             visibleChunks++;
 
-            // 如果区块是脏的，重新生成网格
             if (chunk->isDirty) {
                 rebuildChunkMesh(chunk.get());
             }
 
-            // 渲染区块中的所有方块类型
             for (auto& [typeId, renderer] : chunk->renderers) {
                 if (renderer && renderer->getInstanceCount() > 0) {
                     renderer->render();
                 }
             }
         }
-
-        // 可选：输出调试信息
-        // LOG_DEBUG("Chunks: ", visibleChunks, "/", totalChunks);
     }
 
     int getLoadedChunkCount() const {
@@ -115,8 +111,10 @@ class ChunkManager {
     void generateChunk(const glm::ivec2& coord) {
         auto chunk = std::make_unique<Chunk>(coord);
 
-        // 使用地形生成器填充区块
         auto terrainBlocks = terrainGen->generateChunk(coord.x, coord.y, 16);
+
+        LOG_DEBUG("Generating chunk (", coord.x, ", ", coord.y, ") with ",
+        terrainBlocks.size(), " blocks");
 
         for (const auto& block : terrainBlocks) {
             int localX = block.position.x - coord.x * 16;
@@ -124,13 +122,14 @@ class ChunkManager {
             int localZ = block.position.z - coord.y * 16;
 
             if (localX >= 0 && localX < 16 && localZ >= 0 && localZ < 16 &&
-            localY >= 0 && localY < 16) {
+            localY >= 0 && localY < 256) {
                 chunk->voxels.setBlock(localX, localY, localZ, block.blockTypeId);
             }
         }
 
         chunks[coord] = std::move(chunk);
     }
+
 
     void rebuildChunkMesh(Chunk* chunk) {
         // 生成优化的网格（只包含可见面）

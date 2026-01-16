@@ -6,8 +6,6 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#include <boost/call_traits.hpp>
-
 #include <exception>
 #include <iostream>
 #include <memory>
@@ -33,9 +31,9 @@ auto main(__attribute_maybe_unused__ int argc, __attribute_maybe_unused__ char**
     try {
 
         utils::log().setLevel(utils::LogLevel::DEBUG);
+        utils::log().enableFileLogging();
 
-        LOG_SEPARATOR();
-        LOG_INFO("NATIONAL TECHNOLOGY STARTING");
+        LOG_SECTION("NATIONAL TECHNOLOGY STARTING");
 
         glfwInit();
 
@@ -69,12 +67,16 @@ auto main(__attribute_maybe_unused__ int argc, __attribute_maybe_unused__ char**
         LOG_DEBUG("Max texture size: ", maxTextureSize, "x", maxTextureSize);
 
         glEnable(GL_DEPTH_TEST);
-        glEnable(GL_CULL_FACE);
 
-        glCullFace(GL_BACK);
-        glFrontFace(GL_CCW);
+        // line mode
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
-        LOG_SEPARATOR();
+        // cull invisible face
+        // glEnable(GL_CULL_FACE);
+        // glCullFace(GL_BACK);
+        // glFrontFace(GL_CCW);
+
+        LOG_SECTION("INITIALIZATION FINISHED");
 
         {
             // camera
@@ -147,11 +149,12 @@ auto main(__attribute_maybe_unused__ int argc, __attribute_maybe_unused__ char**
             LOG_INFO("Creating terrain generator");
             game::generator::TerrainGenerator terr_gen(1);
 
-            terr_gen.setScale(0.03f);   // 地形的"放大"程度，越小越平缓
-            terr_gen.setOctaves(1);     // 细节层次，越多越复杂
-            terr_gen.setBaseHeight(50); // 基础高度
-            terr_gen.setMaxHeight(80);  // 最大高度变化
-            terr_gen.setWaterLevel(18); // 水面高度
+            terr_gen.setScale(0.f); // 稍微增大scale
+            terr_gen.setOctaves(6); // 增加细节层次
+            terr_gen.setPersistence(0.5f);
+            terr_gen.setBaseHeight(30); // 提高基础高度
+            terr_gen.setMaxHeight(40);  // 增加高度变化范围
+            terr_gen.setWaterLevel(25); // 调整水面高度
 
             LOG_INFO("Generating terrain...");
             auto terrainBlocks = terr_gen.generateFlatTerrain(1024, 1024, 0, 0);
@@ -182,8 +185,9 @@ auto main(__attribute_maybe_unused__ int argc, __attribute_maybe_unused__ char**
             game::chuck::ChunkManager chunkManager(&meshBuilder, &terr_gen);
             chunkManager.setRenderDistance(8); // 8个区块的渲染距离
 
+
             LOG_SEPARATOR();
-            LOG_INFO("GAME START");
+            LOG_SECTION("GAME START");
 
             float frame_delta_time = 0.0f;
             float last_frame_time  = 0.0f;
@@ -212,6 +216,11 @@ auto main(__attribute_maybe_unused__ int argc, __attribute_maybe_unused__ char**
                     camera.processKeyboard(renderer::CameraMovement::UP, frame_delta_time);
                 if (glfwGetKey(window.get(), GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
                     camera.processKeyboard(renderer::CameraMovement::DOWN, frame_delta_time);
+                if (glfwGetKey(window.get(), GLFW_KEY_TAB) == GLFW_PRESS) {
+                    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+                } else {
+                    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+                }
 
                 // 每10帧更新一次区块加载
                 if (frame_cnt % 10 == 0) {
@@ -249,6 +258,7 @@ auto main(__attribute_maybe_unused__ int argc, __attribute_maybe_unused__ char**
         }
 
         LOG_INFO("Shut down");
+        LOG_FLUSH();
         glfwTerminate();
 
     } catch (std::exception& e) {

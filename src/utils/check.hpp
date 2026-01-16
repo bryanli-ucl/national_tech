@@ -2,7 +2,7 @@
 
 #include <GLFW/glfw3.h>
 
-#include "utils/logger.hpp"
+#include "utils/logger/logger.hpp"
 
 void checkGLError(const char* stmt, const char* fname, int line) {
     GLenum err = glGetError();

@@ -20,6 +20,7 @@ std::string read_file(const std::string& path) {
     if (!f.read(&ret[0], sz)) {
         throw std::runtime_error("cannot read file: " + path);
     }
+
     return ret;
 }
 } // namespace utils
