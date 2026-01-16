@@ -86,7 +86,7 @@ class TerrainGenerator {
                 if (height < waterLevel) {
                     for (int y = height + 1; y <= waterLevel; y++) {
                         blocks.emplace_back(glm::ivec3(worldX, y, worldZ),
-                        ::game::BlockIDs::WATER);
+                        ::game::blocks::BlockIDs::WATER);
                     }
                 }
             }
@@ -127,23 +127,24 @@ class TerrainGenerator {
     // 根据位置和高度决定方块类型
     uint32_t getBlockTypeAtPosition(int x, int y, int z, int surfaceHeight) {
         // 最底层是基岩（这里用石头代替）
+        using namespace ::game::blocks::BlockIDs;
         if (y == 0) {
-            return BlockIDs::STONE;
+            return STONE;
         }
 
         // 表面层
         if (y == surfaceHeight) {
             // 高海拔是石头
             if (y > baseHeight + maxHeight * 0.7) {
-                return BlockIDs::STONE;
+                return STONE;
             }
             // 沙滩（靠近水面）
             else if (y <= waterLevel + 2) {
-                return BlockIDs::SAND;
+                return SAND;
             }
             // 普通草地
             else {
-                return BlockIDs::GRASS;
+                return GRASS;
             }
         }
 
@@ -151,20 +152,20 @@ class TerrainGenerator {
         if (y > surfaceHeight - 3 && y < surfaceHeight) {
             // 沙滩下是沙子
             if (surfaceHeight <= waterLevel + 2) {
-                return BlockIDs::SAND;
+                return SAND;
             }
             // 草地下是泥土
             else {
-                return BlockIDs::DIRT;
+                return DIRT;
             }
         }
 
         // 更深的地下是石头
         if (y < surfaceHeight - 3) {
-            return BlockIDs::STONE;
+            return STONE;
         }
 
-        return 0; // 空气
+        return AIR; // 空气
     }
 };
 

@@ -29,6 +29,23 @@ inline void initializeBlockTypes() {
     registry.registerBlock("dirt")
     .setTexture("dirt")
     .setHardness(0.5f);
+
+    registry.registerBlock("stone")
+    .setTexture("stone")
+    .setHardness(1.5f);
+
+    registry.registerBlock("wood")
+    .setTopSideBottom("pale_oak_log_top", "pale_oak_log_side", "pale_oak_log_top")
+    .setHardness(2.0f);
+
+    registry.registerBlock("leaves")
+    .setTexture("azalea_leaves")
+    .setTransparent(true)
+    .setHardness(0.2f);
+
+    registry.registerBlock("sand")
+    .setTexture("sand")
+    .setHardness(0.5f);
 }
 
 } // namespace game::blocks

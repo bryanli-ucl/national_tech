@@ -20,6 +20,7 @@
 
 #include "game/blocks/blocks.hpp"
 #include "game/blocks/blocks_mesh_builder.hpp"
+#include "game/generator/terrain_generator.hpp"
 
 #include "utils/check.hpp"
 
@@ -71,7 +72,7 @@ auto main(__attribute_maybe_unused__ int argc, __attribute_maybe_unused__ char**
 
             // camera
             LOG_INFO("Creating camera");
-            renderer::Camera camera(glm::vec3(0.0f, 0.0f, 10.0f));
+            renderer::Camera camera(glm::vec3(0.0f, 25.0f, 10.0f));
             glfwSetInputMode(window.get(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
             glfwSetCursorPosCallback(window.get(),
@@ -134,6 +135,20 @@ auto main(__attribute_maybe_unused__ int argc, __attribute_maybe_unused__ char**
             LOG_INFO("Initializing block types");
             game::blocks::initializeBlockTypes();
 
+            // terrain generater
+            LOG_INFO("Creating terrain generator");
+            game::generator::TerrainGenerator terrainGen(12345);
+
+            terrainGen.setScale(0.03f);   // 地形的"放大"程度，越小越平缓
+            terrainGen.setOctaves(5);     // 细节层次，越多越复杂
+            terrainGen.setBaseHeight(20); // 基础高度
+            terrainGen.setMaxHeight(20);  // 最大高度变化
+            terrainGen.setWaterLevel(18); // 水面高度
+
+            LOG_INFO("Generating terrain...");
+            auto terrainBlocks = terrainGen.generateFlatTerrain(32, 32, 0, 0);
+            LOG_INFO("Generated ", terrainBlocks.size(), " terrain blocks");
+
             // atlas metadata
             LOG_INFO("Loading atlas metadata from JSON...");
             renderer::TextureAtlas atlas;
@@ -160,6 +175,34 @@ auto main(__attribute_maybe_unused__ int argc, __attribute_maybe_unused__ char**
             auto* dirt_t        = game::blocks::BlockTypeRegistry::getInstance().getBlockType("dirt");
             if (!grass_block_t || !dirt_t) {
                 throw std::runtime_error("Grass block type not found!");
+            }
+
+
+            auto& registry = game::blocks::BlockTypeRegistry::getInstance();
+
+            std::unordered_map<uint32_t, std::unique_ptr<renderer::InstancedBlockRenderer>> blockRenderers;
+
+            // 预创建所有方块类型的渲染器
+            for (const auto& [id, blockType] : registry.getAllBlockTypes()) {
+                if (id == 0) continue; // 跳过空气
+
+                auto mesh          = meshBuilder.generateBlockMesh(*blockType);
+                blockRenderers[id] = std::make_unique<renderer::InstancedBlockRenderer>(mesh, 100000);
+            }
+
+            // 将地形方块分配到对应的渲染器
+            std::unordered_map<uint32_t, std::vector<renderer::BlockInstance>> instancesByType;
+
+            for (const auto& block : terrainBlocks) {
+                instancesByType[block.blockTypeId].emplace_back(
+                glm::vec3(block.position.x, block.position.y, block.position.z));
+            }
+
+            // 上传实例数据到GPU
+            for (auto& [typeId, instances] : instancesByType) {
+                LOG_INFO("Block type ", typeId, ": ", instances.size(), " instances");
+                blockRenderers[typeId]->addInstances(instances);
+                blockRenderers[typeId]->updateInstanceBuffer();
             }
 
             // mesh
@@ -270,15 +313,21 @@ auto main(__attribute_maybe_unused__ int argc, __attribute_maybe_unused__ char**
                 instanced_shader.set("lightPos", glm::vec3(1.2f, 1.0f, 2.0f));
                 instanced_shader.set("lightColor", glm::vec3(1.0f, 1.0f, 1.0f));
 
-                grassRenderer.render();
+                // grassRenderer.render();
 
-                lighting_shader.activate();
-                lighting_shader.set("texture1", 0);
-                lighting_shader.set("view", view);
-                lighting_shader.set("projection", projection);
-                lighting_shader.set("lightPos", glm::vec3(1.2f, 1.0f, 2.0f));
-                lighting_shader.set("viewPos", glm::vec3(0.0f, 0.0f, 5.0f));
-                lighting_shader.set("lightColor", glm::vec3(1.0f, 1.0f, 1.0f));
+                for (const auto& [typeId, renderer] : blockRenderers) {
+                    if (renderer->getInstanceCount() > 0) {
+                        renderer->render();
+                    }
+                }
+
+                // lighting_shader.activate();
+                // lighting_shader.set("texture1", 0);
+                // lighting_shader.set("view", view);
+                // lighting_shader.set("projection", projection);
+                // lighting_shader.set("lightPos", glm::vec3(1.2f, 1.0f, 2.0f));
+                // lighting_shader.set("viewPos", glm::vec3(0.0f, 0.0f, 5.0f));
+                // lighting_shader.set("lightColor", glm::vec3(1.0f, 1.0f, 1.0f));
 
 
                 // 绘制立方体
