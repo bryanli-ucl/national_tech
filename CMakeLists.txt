@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.28)
 
 project(national_technology VERSION 1.0.0)
 
-set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(glfw3 CONFIG REQUIRED)
@@ -25,6 +25,7 @@ file(GLOB_RECURSE SOURCES
 )
 
 include_directories(include)
+include_directories(src)
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 
