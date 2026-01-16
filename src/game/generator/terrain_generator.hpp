@@ -125,7 +125,7 @@ class TerrainGenerator {
 
     private:
     // 根据位置和高度决定方块类型
-    uint32_t getBlockTypeAtPosition(int x, int y, int z, int surfaceHeight) {
+    uint32_t getBlockTypeAtPosition(__attribute_maybe_unused__ int x, __attribute_maybe_unused__ int y, __attribute_maybe_unused__ int z, int surfaceHeight) {
         // 最底层是基岩（这里用石头代替）
         using namespace ::game::blocks::BlockIDs;
         if (y == 0) {

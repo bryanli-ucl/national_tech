@@ -45,7 +45,7 @@ class Camera {
       front(glm::vec3(0.0f, 0.0f, -1.0f)),
       worldUp(up),
       yaw(yaw), pitch(pitch),
-      movementSpeed(2.5f),
+      movementSpeed(8.0f),
       mouseSensitivity(0.1f),
       zoom(45.0f) {
         updateCameraVectors();

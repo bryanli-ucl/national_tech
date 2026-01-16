@@ -13,6 +13,7 @@
 #include <memory>
 
 #include "renderer/camera/camera.hpp"
+#include "renderer/mesh/frustum.hpp"
 #include "renderer/mesh/mesh.hpp"
 #include "renderer/render/instanced_block_renderer.hpp"
 #include "renderer/shader/shader.hpp"
@@ -20,7 +21,10 @@
 
 #include "game/blocks/blocks.hpp"
 #include "game/blocks/blocks_mesh_builder.hpp"
+#include "game/chuck/chuck_manager.hpp"
+#include "game/chuck/chunk_mesh_optimizer.hpp"
 #include "game/generator/terrain_generator.hpp"
+
 
 #include "utils/check.hpp"
 
@@ -42,7 +46,7 @@ auto main(__attribute_maybe_unused__ int argc, __attribute_maybe_unused__ char**
 
         LOG_INFO("Creating game window");
         std::shared_ptr<GLFWwindow> window(
-        glfwCreateWindow(1280, 720, "National Technology", nullptr, nullptr),
+        glfwCreateWindow(1920, 1080, "National Technology", nullptr, nullptr),
         [](GLFWwindow* win) {
             glfwDestroyWindow(win);
         });
@@ -65,14 +69,18 @@ auto main(__attribute_maybe_unused__ int argc, __attribute_maybe_unused__ char**
         LOG_DEBUG("Max texture size: ", maxTextureSize, "x", maxTextureSize);
 
         glEnable(GL_DEPTH_TEST);
+        glEnable(GL_CULL_FACE);
+
+        glCullFace(GL_BACK);
+        glFrontFace(GL_CCW);
 
         LOG_SEPARATOR();
 
         {
-
             // camera
             LOG_INFO("Creating camera");
             renderer::Camera camera(glm::vec3(0.0f, 25.0f, 10.0f));
+            renderer::Frustum frustum;
             glfwSetInputMode(window.get(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
             glfwSetCursorPosCallback(window.get(),
@@ -137,16 +145,16 @@ auto main(__attribute_maybe_unused__ int argc, __attribute_maybe_unused__ char**
 
             // terrain generater
             LOG_INFO("Creating terrain generator");
-            game::generator::TerrainGenerator terrainGen(12345);
+            game::generator::TerrainGenerator terr_gen(1);
 
-            terrainGen.setScale(0.03f);   // 地形的"放大"程度，越小越平缓
-            terrainGen.setOctaves(5);     // 细节层次，越多越复杂
-            terrainGen.setBaseHeight(20); // 基础高度
-            terrainGen.setMaxHeight(20);  // 最大高度变化
-            terrainGen.setWaterLevel(18); // 水面高度
+            terr_gen.setScale(0.03f);   // 地形的"放大"程度，越小越平缓
+            terr_gen.setOctaves(1);     // 细节层次，越多越复杂
+            terr_gen.setBaseHeight(50); // 基础高度
+            terr_gen.setMaxHeight(80);  // 最大高度变化
+            terr_gen.setWaterLevel(18); // 水面高度
 
             LOG_INFO("Generating terrain...");
-            auto terrainBlocks = terrainGen.generateFlatTerrain(32, 32, 0, 0);
+            auto terrainBlocks = terr_gen.generateFlatTerrain(1024, 1024, 0, 0);
             LOG_INFO("Generated ", terrainBlocks.size(), " terrain blocks");
 
             // atlas metadata
@@ -169,104 +177,10 @@ auto main(__attribute_maybe_unused__ int argc, __attribute_maybe_unused__ char**
 
 
             // mesh builder
-            game::blocks::BlockMeshBuilder meshBuilder(&atlas);
+            game::chuck::OptimizedChunkMeshBuilder meshBuilder(&atlas);
 
-            auto* grass_block_t = game::blocks::BlockTypeRegistry::getInstance().getBlockType("grass");
-            auto* dirt_t        = game::blocks::BlockTypeRegistry::getInstance().getBlockType("dirt");
-            if (!grass_block_t || !dirt_t) {
-                throw std::runtime_error("Grass block type not found!");
-            }
-
-
-            auto& registry = game::blocks::BlockTypeRegistry::getInstance();
-
-            std::unordered_map<uint32_t, std::unique_ptr<renderer::InstancedBlockRenderer>> blockRenderers;
-
-            // 预创建所有方块类型的渲染器
-            for (const auto& [id, blockType] : registry.getAllBlockTypes()) {
-                if (id == 0) continue; // 跳过空气
-
-                auto mesh          = meshBuilder.generateBlockMesh(*blockType);
-                blockRenderers[id] = std::make_unique<renderer::InstancedBlockRenderer>(mesh, 100000);
-            }
-
-            // 将地形方块分配到对应的渲染器
-            std::unordered_map<uint32_t, std::vector<renderer::BlockInstance>> instancesByType;
-
-            for (const auto& block : terrainBlocks) {
-                instancesByType[block.blockTypeId].emplace_back(
-                glm::vec3(block.position.x, block.position.y, block.position.z));
-            }
-
-            // 上传实例数据到GPU
-            for (auto& [typeId, instances] : instancesByType) {
-                LOG_INFO("Block type ", typeId, ": ", instances.size(), " instances");
-                blockRenderers[typeId]->addInstances(instances);
-                blockRenderers[typeId]->updateInstanceBuffer();
-            }
-
-            // mesh
-            LOG_INFO("Generating block meshes");
-            auto grass_block_mesh = meshBuilder.generateBlockMesh(*grass_block_t);
-            auto stone_mesh       = meshBuilder.generateBlockMesh(*dirt_t, glm::vec3(2.0f, 0.0f, 0.0f));
-
-            renderer::CubeMesh::MeshData static_mesh;
-            static_mesh.append(grass_block_mesh);
-            static_mesh.append(stone_mesh);
-
-            LOG_DEBUG("Mesh created - Vertices: ", static_mesh.vertices.size(), ", Indices: ", static_mesh.indices.size());
-
-            // instanced renderer
-            renderer::InstancedBlockRenderer grassRenderer(grass_block_mesh, 10000);
-            std::vector<renderer::BlockInstance> instances;
-
-            for (int x = -5; x < 5; x++) {
-                for (int y = -5; y < 5; y++) {
-                    for (int z = -5; z < 5; z++) {
-                        instances.emplace_back(glm::vec3(x * 1.0f, y * 1.0f, z * 1.0f));
-                    }
-                }
-            }
-
-            LOG_INFO("Adding ", instances.size(), " block instances");
-            grassRenderer.addInstances(instances);
-            grassRenderer.updateInstanceBuffer();
-
-            LOG_INFO("Instance count: ", grassRenderer.getInstanceCount());
-
-            uint32_t VBO, VAO, EBO;
-            glGenVertexArrays(1, &VAO);
-            glGenBuffers(1, &VBO);
-            glGenBuffers(1, &EBO);
-
-            glBindVertexArray(VAO);
-
-            glBindBuffer(GL_ARRAY_BUFFER, VBO);
-            glBufferData(GL_ARRAY_BUFFER,
-            static_mesh.vertices.size() * sizeof(renderer::Vertex),
-            static_mesh.vertices.data(), GL_STATIC_DRAW);
-
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-            static_mesh.indices.size() * sizeof(uint32_t),
-            static_mesh.indices.data(), GL_STATIC_DRAW);
-
-            // 位置属性
-            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(renderer::Vertex),
-            (void*)offsetof(renderer::Vertex, position));
-            glEnableVertexAttribArray(0);
-
-            // 法线属性
-            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(renderer::Vertex),
-            (void*)offsetof(renderer::Vertex, normal));
-            glEnableVertexAttribArray(1);
-
-            // 纹理坐标属性
-            glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(renderer::Vertex),
-            (void*)offsetof(renderer::Vertex, texCoord));
-            glEnableVertexAttribArray(2);
-
-            LOG_INFO("VAO, VBO, EBO setup");
+            game::chuck::ChunkManager chunkManager(&meshBuilder, &terr_gen);
+            chunkManager.setRenderDistance(8); // 8个区块的渲染距离
 
             LOG_SEPARATOR();
             LOG_INFO("GAME START");
@@ -277,11 +191,13 @@ auto main(__attribute_maybe_unused__ int argc, __attribute_maybe_unused__ char**
             __attribute_maybe_unused__ size_t frame_cnt = 0;
             while (!glfwWindowShouldClose(window.get())) {
 
+                // frame time stat
                 float current_frame_time = glfwGetTime();
                 frame_delta_time         = current_frame_time - last_frame_time;
                 last_frame_time          = current_frame_time;
                 frame_cnt++;
 
+                // input process
                 if (glfwGetKey(window.get(), GLFW_KEY_ESCAPE) == GLFW_PRESS)
                     glfwSetWindowShouldClose(window.get(), true);
                 if (glfwGetKey(window.get(), GLFW_KEY_W) == GLFW_PRESS)
@@ -297,42 +213,31 @@ auto main(__attribute_maybe_unused__ int argc, __attribute_maybe_unused__ char**
                 if (glfwGetKey(window.get(), GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
                     camera.processKeyboard(renderer::CameraMovement::DOWN, frame_delta_time);
 
+                // 每10帧更新一次区块加载
+                if (frame_cnt % 10 == 0) {
+                    chunkManager.update(camera.position);
+                }
+
                 GL_CHECK(glClearColor(0.2f, 0.3f, 0.3f, 1.0f));
                 GL_CHECK(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
 
                 universe_atlas_texture.bind(0);
 
+                instanced_shader.activate();
+                instanced_shader.set("texture1", 0);
+
                 glm::mat4 view       = camera.getViewMatrix();
                 glm::mat4 projection = camera.getProjectionMatrix(1280.0f / 720.0f);
 
-                instanced_shader.activate();
-                instanced_shader.set("texture1", 0);
+                frustum.extractFromMatrix(projection * view);
+
                 instanced_shader.set("view", view);
                 instanced_shader.set("projection", projection);
                 instanced_shader.set("viewPos", camera.position);
-                instanced_shader.set("lightPos", glm::vec3(1.2f, 1.0f, 2.0f));
+                instanced_shader.set("lightPos", glm::vec3(100.0f, 100.0f, 2.0f));
                 instanced_shader.set("lightColor", glm::vec3(1.0f, 1.0f, 1.0f));
 
-                // grassRenderer.render();
-
-                for (const auto& [typeId, renderer] : blockRenderers) {
-                    if (renderer->getInstanceCount() > 0) {
-                        renderer->render();
-                    }
-                }
-
-                // lighting_shader.activate();
-                // lighting_shader.set("texture1", 0);
-                // lighting_shader.set("view", view);
-                // lighting_shader.set("projection", projection);
-                // lighting_shader.set("lightPos", glm::vec3(1.2f, 1.0f, 2.0f));
-                // lighting_shader.set("viewPos", glm::vec3(0.0f, 0.0f, 5.0f));
-                // lighting_shader.set("lightColor", glm::vec3(1.0f, 1.0f, 1.0f));
-
-
-                // 绘制立方体
-                GL_CHECK(glBindVertexArray(VAO));
-                GL_CHECK(glDrawElements(GL_TRIANGLES, static_mesh.indices.size(), GL_UNSIGNED_INT, 0));
+                chunkManager.render(frustum);
 
                 glfwSwapBuffers(window.get());
                 glfwPollEvents();
@@ -341,8 +246,6 @@ auto main(__attribute_maybe_unused__ int argc, __attribute_maybe_unused__ char**
             LOG_INFO("Exit game loop");
 
             LOG_INFO("Cleaning up");
-            glDeleteVertexArrays(1, &VAO);
-            glDeleteBuffers(1, &VBO);
         }
 
         LOG_INFO("Shut down");

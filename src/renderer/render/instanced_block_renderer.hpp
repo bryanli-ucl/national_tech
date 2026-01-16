@@ -1,3 +1,4 @@
+#pragma once
 
 #include <glad/glad.h>
 
@@ -76,8 +77,7 @@ class InstancedBlockRenderer {
         // 设置实例化属性（模型矩阵）
         // 模型矩阵是4x4，需要4个vec4来存储
         glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
-        glBufferData(GL_ARRAY_BUFFER,
-        maxInstances * sizeof(glm::mat4), nullptr, GL_DYNAMIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, maxInstances * sizeof(glm::mat4), nullptr, GL_STATIC_DRAW);
 
         // mat4需要占用4个attribute位置
         for (int i = 0; i < 4; i++) {
