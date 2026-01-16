@@ -7,6 +7,8 @@
 #include <iostream>
 #include <stdexcept>
 
+#include "utils/logger.hpp"
+
 namespace renderer {
 
 texture::texture(const std::string& path, bool flip)
@@ -20,8 +22,7 @@ texture::texture(const std::string& path, bool flip)
         throw std::runtime_error("Failed to load texture: " + path);
     }
 
-    std::cout << "Loaded texture: " << path << " (" << m_width << "x" << m_height
-              << ", " << m_channels << " channels)" << std::endl;
+    LOG_DEBUG("Loaded texture: ", path, " (", m_width, "x", m_height, ", ", m_channels, " channels)");
 
     glGenTextures(1, &m_id);
     glBindTexture(GL_TEXTURE_2D, m_id);

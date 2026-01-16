@@ -16,31 +16,25 @@
 #include "renderer/shader/shader.hpp"
 #include "renderer/texture/texture.hpp"
 
+#include "utils/check.hpp"
+
 // 错误检查函数
-void checkGLError(const char* stmt, const char* fname, int line) {
-    GLenum err = glGetError();
-    while (err != GL_NO_ERROR) {
-        std::cerr << "OpenGL error " << err << " at " << fname << ":" << line
-                  << " - for " << stmt << std::endl;
-        err = glGetError();
-    }
-}
-
-#define GL_CHECK(stmt)                           \
-    do {                                         \
-        stmt;                                    \
-        checkGLError(#stmt, __FILE__, __LINE__); \
-    } while (0)
-
 auto main(__attribute_maybe_unused__ int argc, __attribute_maybe_unused__ char** argv) -> int {
 
     try {
+
+        utils::log().setLevel(utils::LogLevel::DEBUG);
+
+        LOG_INFO("NATIONAL TECHNOLOGY STARTING");
+
         glfwInit();
 
+        LOG_DEBUG("Set GLFW version");
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
+        LOG_INFO("Creating game window");
         std::shared_ptr<GLFWwindow> window(
         glfwCreateWindow(1280, 720, "National Technology", nullptr, nullptr),
         [](GLFWwindow* win) {
@@ -50,49 +44,46 @@ auto main(__attribute_maybe_unused__ int argc, __attribute_maybe_unused__ char**
             throw std::runtime_error("cannot create GL window");
 
         glfwMakeContextCurrent(window.get());
+
+        LOG_DEBUG("Set window callback function");
         glfwSetFramebufferSizeCallback(window.get(), [](__attribute_maybe_unused__ GLFWwindow* win, int width, int height) {
             glViewport(0, 0, width, height);
         });
 
+        LOG_DEBUG("Set glad");
         if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
             throw std::runtime_error("cannot initialize GLAD");
 
         GLint maxTextureSize;
         glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxTextureSize);
-        std::cout << "Max texture size: " << maxTextureSize << "x" << maxTextureSize << std::endl;
+        LOG_DEBUG("Max texture size: ", maxTextureSize, "x", maxTextureSize);
 
         glEnable(GL_DEPTH_TEST);
 
         {
             // shader
-            std::cout << "Creating shader..." << std::endl;
+            LOG_INFO("Compiling shaders");
 
             renderer::shader lighting_shader(
             "resources/shaders/default/default.vert",
             "resources/shaders/default/default.frag");
 
-            std::cout << "Shader created with ID: " << lighting_shader.get_id() << std::endl;
+            LOG_DEBUG("Shader created with ID: ", lighting_shader.get_id());
 
             // texture
-            std::cout << "Loading texture atlas..." << std::endl;
+            LOG_INFO("Load texture atlas");
             renderer::texture atlas_texture("resources/textures/blocks/block_atlas.png");
-            std::cout << "Texture loaded - ID: " << atlas_texture.get_id()
-                      << ", Size: " << atlas_texture.get_width() << "x" << atlas_texture.get_height() << std::endl;
+            LOG_DEBUG("Texture loaded - ID: ", atlas_texture.get_id(), ", Size: ", atlas_texture.get_width(), "x", atlas_texture.get_height());
 
             // atlas metadata
-            std::cout << "Loading atlas metadata..." << std::endl;
+            LOG_INFO("Loading atlas metadata...");
             renderer::TextureAtlas atlas;
-            atlas.setupFromImageSize(
-            atlas_texture.get_width(),
-            atlas_texture.get_height(),
-            16 // 纹理大小
-            );
+            atlas.setupFromImageSize(atlas_texture.get_width(), atlas_texture.get_height(), 16);
 
-            std::cout << "\nRegistering textures:" << std::endl;
+            LOG_INFO("Registing texture coordination");
             atlas.registerTexture("grass_top", 8);  // 第一个纹理
             atlas.registerTexture("grass_side", 5); // 第二个纹理
             atlas.registerTexture("dirt", 6);       // 第三个纹理
-
             /*
             6 7 8
             3 4 5
@@ -100,18 +91,9 @@ auto main(__attribute_maybe_unused__ int argc, __attribute_maybe_unused__ char**
             */
 
             // mesh
-            std::cout << "Generating grass block mesh..." << std::endl;
+            LOG_INFO("Generating block meshes");
             auto meshData = renderer::IndexedCubeMesh::createGrassBlockFromAtlas(atlas);
-
-            std::cout << "Mesh created - Vertices: " << meshData.vertices.size()
-                      << ", Indices: " << meshData.indices.size() << std::endl;
-
-            std::cout << "Sample UV coordinates:" << std::endl;
-            for (size_t i = 0; i < std::min(size_t(6), meshData.vertices.size()); ++i) {
-                std::cout << "  Vertex " << i << ": UV("
-                          << meshData.vertices[i].texCoord.x << ", "
-                          << meshData.vertices[i].texCoord.y << ")" << std::endl;
-            }
+            LOG_DEBUG("Mesh created - Vertices: ", meshData.vertices.size(), ", Indices: ", meshData.indices.size());
 
             uint32_t VBO, VAO, EBO;
             glGenVertexArrays(1, &VAO);
@@ -145,16 +127,15 @@ auto main(__attribute_maybe_unused__ int argc, __attribute_maybe_unused__ char**
             (void*)offsetof(renderer::Vertex, texCoord));
             glEnableVertexAttribArray(2);
 
-            std::cout << "VAO setup complete" << std::endl;
-            std::cout << "Entering render loop..." << std::endl;
+            LOG_INFO("VAO, VBO, EBO setup");
+
+            LOG_INFO("GAME START");
 
             // 光照和相机参数
             glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
             glm::vec3 viewPos(0.0f, 0.0f, 3.0f);
 
-            std::cout << "Entering render loop..." << std::endl;
-
-            int frameCount = 0;
+            __attribute_maybe_unused__ size_t frame_cnt = 0;
             while (!glfwWindowShouldClose(window.get())) {
 
                 if (glfwGetKey(window.get(), GLFW_KEY_ESCAPE) == GLFW_PRESS)
@@ -191,44 +172,23 @@ auto main(__attribute_maybe_unused__ int argc, __attribute_maybe_unused__ char**
                 GL_CHECK(glBindVertexArray(VAO));
                 GL_CHECK(glDrawElements(GL_TRIANGLES, meshData.indices.size(), GL_UNSIGNED_INT, 0));
 
-                if (frameCount < 5 || frameCount % 100 == 0) {
-                    std::cout << "Frame " << frameCount << " rendered" << std::endl;
-                }
-
-                if (frameCount == 0) {
-                    std::cout << "\n=== Mesh Debug Info ===" << std::endl;
-                    std::cout << "Vertices count: " << meshData.vertices.size() << std::endl;
-                    std::cout << "Indices count: " << meshData.indices.size() << std::endl;
-
-                    // 打印前几个顶点的纹理坐标
-                    std::cout << "First 4 vertices UV coords:" << std::endl;
-                    for (size_t i = 0; i < std::min(size_t(4), meshData.vertices.size()); ++i) {
-                        auto& v = meshData.vertices[i];
-                        std::cout << "  Vertex " << i << ": UV("
-                                  << v.texCoord.x << ", " << v.texCoord.y << ")" << std::endl;
-                    }
-                    std::cout << "======================\n"
-                              << std::endl;
-                }
-
                 glfwSwapBuffers(window.get());
                 glfwPollEvents();
-                frameCount++;
+                frame_cnt++;
             }
 
-            std::cout << "Exited render loop" << std::endl;
-            std::cout << "Cleaning up..." << std::endl;
+            LOG_INFO("Exit game loop");
+
+            LOG_INFO("Cleaning up");
             glDeleteVertexArrays(1, &VAO);
             glDeleteBuffers(1, &VBO);
-            std::cout << "Cleanup complete" << std::endl;
         }
 
+        LOG_INFO("Shut down");
         glfwTerminate();
-        std::cout << "Terminating GLFW..." << std::endl;
-
-        std::cout << "Program ended successfully!" << std::endl;
     } catch (std::exception& e) {
-        std::cerr << "Exception: " << e.what() << std::endl;
+        LOG_FATAL("FATAL EXCEPTION: ", e.what());
+        glfwTerminate();
     }
     return 0;
 }

@@ -5,6 +5,8 @@
 #include <string>
 #include <unordered_map>
 
+#include "utils/logger.hpp"
+
 namespace renderer {
 
 struct TextureUV {
@@ -32,23 +34,23 @@ class TextureAtlas {
         m_texture_size     = texture_size;
         m_textures_per_row = atlas_width / texture_size;
 
-        std::cout << "Atlas setup:" << std::endl;
-        std::cout << "  Atlas size: " << m_atlas_size << "x" << atlas_height << std::endl;
-        std::cout << "  Texture size: " << m_texture_size << "x" << m_texture_size << std::endl;
-        std::cout << "  Textures per row: " << m_textures_per_row << std::endl;
-        std::cout << "  Max textures: " << m_textures_per_row * (atlas_height / texture_size) << std::endl;
+        LOG_DEBUG("Atlas setup:");
+        LOG_DEBUG("  Atlas size: ", m_atlas_size, "x", atlas_height);
+        LOG_DEBUG("  Texture size: ", m_texture_size, "x", m_texture_size);
+        LOG_DEBUG("  Textures per row: ", m_textures_per_row);
+        LOG_DEBUG("  Max textures: ", m_textures_per_row * (atlas_height / texture_size));
     }
 
     // 手动注册纹理名称和索引
     void registerTexture(const std::string& name, int index) {
         m_texture_indices[name] = index;
-        std::cout << "  Registered: '" << name << "' -> index " << index << std::endl;
+        LOG_DEBUG("  Registered: '", name, "' at index ", index);
     }
 
     // 根据索引计算 UV
     TextureUV getUVByIndex(int index) const {
         if (m_textures_per_row == 0) {
-            std::cerr << "Error: Atlas not initialized!" << std::endl;
+            LOG_ERROR("Atlas not initialized!");
             return TextureUV();
         }
 
@@ -70,7 +72,7 @@ class TextureAtlas {
             return getUVByIndex(it->second);
         }
 
-        std::cerr << "Warning: Texture '" << name << "' not found, using default" << std::endl;
+        LOG_WARN("Warning: Texture '", name, "' not found, using default");
         return getUVByIndex(0); // 返回第一个纹理
     }
 
